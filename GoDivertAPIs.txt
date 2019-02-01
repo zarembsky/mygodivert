@@ -1,0 +1,34 @@
+// Inject the packet on the Network Stack
+// If the packet has been modified calls WinDivertHelperCalcChecksum to get a new checksum
+func (p *Packet) Send(wd *WinDivertHandle) (uint, error) {
+	if p.parsed && (p.IpHdr.NeedNewChecksum() || p.NextHeader != nil && p.NextHeader.NeedNewChecksum()) {
+		wd.HelperCalcChecksum(p)
+	}
+	return wd.Send(p)
+}
+
+//////////////////////////////
+
+// Inject the packet on the Network Stack
+// https://reqrypt.org/windivert-doc.html#divert_send
+func (wd *WinDivertHandle) Send(packet *Packet) (uint, error) {
+	var sendLen uint
+
+	if !wd.open {
+		return 0, errors.New("can't Send, the handle isn't open")
+	}
+
+	success, _, err := winDivertSend.Call(wd.handle,
+		uintptr(unsafe.Pointer(&(packet.Raw[0]))),
+		uintptr(packet.PacketLen),
+		uintptr(unsafe.Pointer(packet.Addr)),
+		uintptr(unsafe.Pointer(&sendLen)))
+
+	if success == 0 {
+		return 0, err
+	}
+
+	return sendLen, nil
+}
+
+10.156.81.66
